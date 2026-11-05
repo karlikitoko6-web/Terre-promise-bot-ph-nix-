@@ -1,4 +1,12 @@
+const fs = require('fs');
+const express = require('express');
+const login = require('ws3-fca');
 
+const app = express();
+app.get('/', (req,res) => res.send('Terre Promise Bot Phoenix Live 🔥'));
+app.listen(process.env.PORT || 10000, () => console.log("Bot web en ligne"));
+
+const appState = JSON.parse(fs.readFileSync('./appstate.json','utf8'));
 
 let jeux = {};
 const blagues = [
