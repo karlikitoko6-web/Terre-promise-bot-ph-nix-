@@ -1,11 +1,4 @@
-const express = require('express');
-const app = express();
-app.use(express.json());
-const PORT = process.env.PORT || 3000;
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'terrepromise123';
-const PAGE_TOKEN = process.env.PAGE_ACCESS_TOKEN || '';
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || '';
-const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || '';
+
 
 let jeux = {};
 const blagues = [
