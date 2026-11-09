@@ -14,7 +14,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('Serveur OK sur port ' + PORT);
 });
 
-// Config OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
@@ -22,14 +21,12 @@ const openai = new OpenAI({
 const appState = JSON.parse(fs.readFileSync('appstate.json', 'utf8'));
 
 const config = {
-  appState: appState,
-  autoMarkDelivery: false,
-  selfListen: false
+  appState: appState
 };
 
 console.log('Connexion à Facebook...');
 
-login(config, (err, api) => {
+login(config, async (err, api) => {
   if (err) {
     console.error('ERREUR LOGIN:', err);
     return;
@@ -51,7 +48,7 @@ login(config, (err, api) => {
 
     if (event.type === 'message' && event.body) {
       const msg = event.body.toLowerCase();
-      
+
       if (msg.startsWith('!bot') || msg.startsWith('!terre')) {
         const question = event.body.replace(/!bot|!terre/i, '').trim();
         if (!question) {
@@ -65,7 +62,7 @@ login(config, (err, api) => {
           const completion = await openai.chat.completions.create({
             model: 'gpt-3.5-turbo',
             messages: [
-              {role: 'system', content: 'Tu es Terre Promise Bot Ph-Nix, un assistant sympa et puissant créé par Karli.'},
+              {role: 'system', content: 'Tu es Terre Promise Bot Ph-Nix, assistant sympa créé par Karli.'},
               {role: 'user', content: question}
             ]
           });
@@ -74,7 +71,8 @@ login(config, (err, api) => {
           api.sendMessage(reponse, event.threadID);
 
         } catch (e) {
-          api.sendMessage('Erreur IA: ' + e.message + ' - Vérifie OPENAI_API_KEY sur Render', event.threadID);
+          console.error(e);
+          api.sendMessage('Erreur IA: ' + e.message, event.threadID);
         }
       }
     }
