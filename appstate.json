@@ -1,25 +1,40 @@
 const express = require('express');
 const fs = require('fs');
 const login = require('ws3-fca');
+
 const app = express();
 const PORT = process.env.PORT || 10000;
-app.get('/', (req,res)=>{res.send('BOT OK - Terre Promise');});
-app.listen(PORT,'0.0.0.0',()=>{console.log('Serveur OK sur port '+PORT);});
+
+app.get('/', (req, res) => {
+  res.send('BOT OK');
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('Serveur OK sur port ' + PORT);
+});
+
 console.log('Bot pret, appstate sera lu apres');
-if(fs.existsSync('appstate.json')){
-console.log('appstate.json trouve');
-const appState = JSON.parse(fs.readFileSync('appstate.json','utf8'));
-login({appState}, (err, api)=>{
-if(err){console.log('Erreur login FB: '+JSON.stringify(err));return;}
-console.log('BOT CONNECTE - '+api.getCurrentUserID());
-api.listenMqtt((err, event)=>{
-if(err) return;
-if(event.type==='message' && event.body){
-console.log('Message: '+event.body);
-if(event.body.toLowerCase()==='!bot' || event.body.toLowerCase()==='!ping'){
-api.sendMessage('Oui boss je suis la ! Phenix en ligne 🔥', event.threadID);
+
+if (fs.existsSync('appstate.json')) {
+  console.log('appstate.json trouve');
+  const appState = JSON.parse(fs.readFileSync('appstate.json', 'utf8'));
+  
+  login({ appState }, (err, api) => {
+    if (err) {
+      console.log('Erreur login FB: ' + JSON.stringify(err));
+      return;
+    }
+    console.log('BOT CONNECTE - ' + api.getCurrentUserID());
+    api.listenMqtt((err, event) => {
+      if (err) return;
+      if (event.type === 'message' && event.body) {
+        console.log('Message: ' + event.body);
+        if (event.body.toLowerCase() === '!bot') {
+          api.sendMessage('Oui boss je suis la! Phenix en ligne', event.threadID);
+        }
+      }
+    });
+  });
+} else {
+  console.log('PAS DE appstate.json');
 }
-}
-});
-});
-}else{console.log('PAS DE appstate.json');}
