@@ -1,30 +1,20 @@
-const fs=require('fs');
 const express=require('express');
-const login=require('ws3-fca');
 const app=express();
 const PORT=process.env.PORT||10000;
 app.get('/',(req,res)=>{
- res.send('OK');
+ res.send('BOT OK - Terre Promise');
 });
 app.listen(PORT,'0.0.0.0',()=>{
- console.log('Serveur OK');
+ console.log('Serveur OK sur port '+PORT);
 });
-let raw=fs.readFileSync('appstate.json');
-let appState=JSON.parse(raw);
-login({appState},(err,api)=>{
- if(err){
-  console.log(err);
-  return;
+console.log('Bot pret, appstate sera lu apres');
+try{
+ const fs=require('fs');
+ if(fs.existsSync('appstate.json')){
+  console.log('appstate.json trouve');
+ }else{
+  console.log('PAS DE appstate.json');
  }
- console.log('CONNECTE');
- api.setOptions({
-  listenEvents:true,
-  selfListen:false
- });
- api.listenMqtt((a,e)=>{
-  if(e&&e.body){
-   console.log(e.body);
-   api.sendMessage(e.body,e.threadID);
-  }
- });
-});
+}catch(e){
+ console.log('Erreur:'+e.message);
+}
