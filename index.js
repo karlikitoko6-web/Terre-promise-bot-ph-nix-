@@ -1,79 +1,52 @@
 const fs = require('fs');
 const login = require('ws3-fca');
 const express = require('express');
-const OpenAI = require('openai');
+
+let OpenAI;
+try { OpenAI = require('openai'); } catch(e){ console.log('OpenAI non installé'); }
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+app.get('/', (req,res)=> res.send('BOT TERRE PROMISE EN LIGNE ✅'));
+app.listen(PORT,'0.0.0.0',()=> console.log('Serveur OK '+PORT));
 
-app.get('/', (req, res) => {
-  res.send('BOT TERRE PROMISE PH-NIX EN LIGNE ✅');
-});
+let appState;
+try {
+  appState = JSON.parse(fs.readFileSync('appstate.json','utf8'));
+} catch(e){
+  console.error('ERREUR appstate.json manquant ou invalide:', e.message);
+  // on ne quitte pas, on laisse le serveur tourner pour voir le log
+}
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log('Serveur OK sur port ' + PORT);
-});
+console.log('Connexion FB...');
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+let openai = null;
+if (OpenAI && process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
-const appState = JSON.parse(fs.readFileSync('appstate.json', 'utf8'));
-
-const config = {
-  appState: appState
-};
-
-console.log('Connexion à Facebook...');
-
-login(config, async (err, api) => {
-  if (err) {
-    console.error('ERREUR LOGIN:', err);
-    return;
-  }
-
+login({appState}, async (err, api) => {
+  if (err) { console.error('ERREUR LOGIN FB:', err); return; }
   console.log('✅ BOT CONNECTÉ !');
-
-  api.setOptions({
-    listenEvents: true,
-    selfListen: false,
-    autoMarkRead: true
-  });
-
-  api.listenMqtt(async (err, event) => {
-    if (err) {
-      console.error(err);
-      return;
-    }
-
-    if (event.type === 'message' && event.body) {
-      const msg = event.body.toLowerCase();
-
-      if (msg.startsWith('!bot') || msg.startsWith('!terre')) {
-        const question = event.body.replace(/!bot|!terre/i, '').trim();
-        if (!question) {
-          api.sendMessage('Oui boss ? Pose ta question après !bot', event.threadID);
-          return;
-        }
-
-        try {
-          api.sendMessage('⏳ Terre Promise réfléchit...', event.threadID);
-          
-          const completion = await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo',
-            messages: [
-              {role: 'system', content: 'Tu es Terre Promise Bot Ph-Nix, assistant sympa créé par Karli.'},
-              {role: 'user', content: question}
-            ]
+  api.setOptions({listenEvents:true,selfListen:false,autoMarkRead:true});
+  
+  api.listenMqtt(async (err,event)=>{
+    if(err) return;
+    if(event.type==='message' && event.body){
+      const body = event.body.trim();
+      const low = body.toLowerCase();
+      if(low.startsWith('!bot') || low.startsWith('!terre')){
+        const question = body.replace(/!bot|!terre/i,'').trim();
+        if(!question){ return api.sendMessage('Oui boss ? Tape !bot + ta question', event.threadID); }
+        if(!openai){ return api.sendMessage('Je suis en ligne mais clé OpenAI non configurée sur Render.', event.threadID); }
+        try{
+          api.sendMessage('⏳ Je réfléchis...', event.threadID);
+          const comp = await openai.chat.completions.create({
+            model:'gpt-3.5-turbo',
+            messages:[{role:'system',content:'Tu es Terre Promise Bot Ph-Nix créé par Karli'},{role:'user',content:question}]
           });
-
-          const reponse = completion.choices[0].message.content;
-          api.sendMessage(reponse, event.threadID);
-
-        } catch (e) {
-          console.error(e);
-          api.sendMessage('Erreur IA: ' + e.message, event.threadID);
-        }
+          api.sendMessage(comp.choices[0].message.content, event.threadID);
+        }catch(e){ api.sendMessage('Erreur IA: '+e.message, event.threadID); }
       }
     }
   });
