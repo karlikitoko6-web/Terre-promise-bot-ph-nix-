@@ -1,40 +1,44 @@
 const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const login = require('ws3-fca');
+const OpenAI = require('openai');
 
-// 1. PETIT SERVEUR POUR RENDER - NE PAS ENLEVER
+// 1. SERVEUR POUR RENDER - OBLIGATOIRE
 const app = express();
 const PORT = process.env.PORT || 10000;
 app.get('/', (req, res) => {
-  res.send('BOT TERRE PROMISE EN LIGNE ✅ - Le bot fonctionne');
+  res.send('BOT TERRE PROMISE FB EN LIGNE ✅');
 });
 app.listen(PORT, () => {
   console.log(`Serveur OK port ${PORT}`);
 });
 
-// 2. TON BOT WHATSAPP - TON CODE COMMENCE ICI
-const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: {
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+// 2. CONFIG OPENAI SI TU L'UTILISES
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || 'ta_cle_ici'
+});
+
+// 3. BOT FB WS3-FCA
+const appState = JSON.parse(fs.readFileSync('appstate.json', 'utf8'));
+
+login({ appState: appState }, (err, api) => {
+  if(err) {
+    console.error('Erreur login FB:', err);
+    return;
   }
-});
 
-client.on('qr', qr => {
-  qrcode.generate(qr, {small: true});
-  console.log('Scanne le QR code');
-});
-
-client.on('ready', () => {
   console.log('Bot connecté ✅ Terre Promise prêt !');
+  
+  api.listenMqtt(async (err, event) => {
+    if(err) return console.error(err);
+    
+    if(event.type === 'message' && event.body) {
+      console.log(`Message de ${event.senderID}: ${event.body}`);
+      
+      if(event.body.toLowerCase() === 'salut') {
+        api.sendMessage('Salut boss, Terre Promise Bot est là ✅', event.threadID);
+      }
+      // Ajoute tes autres commandes ici
+    }
+  });
 });
-
-client.on('message', async msg => {
-  // Ton code de réponses ici
-  if(msg.body.toLowerCase() === 'salut'){
-    msg.reply('Salut boss, Terre Promise Bot est là ✅');
-  }
-  // ... garde le reste de tes commandes
-});
-
-client.initialize();
