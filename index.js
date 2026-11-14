@@ -1,85 +1,100 @@
-const fs = require('fs');
-const ws3 = require('ws3-fca');
-const login = ws3.default || ws3.login || ws3;
-const http = require('http');
-http.createServer((req,res)=>{res.end('Terre Promise Hedgehog Live');}).listen(process.env.PORT||10000);
-const appstate = JSON.parse(fs.readFileSync('./appstate.json','utf8'));
-let db={eco:{},pets:{}}; try{db=JSON.parse(fs.readFileSync('./db.json','utf8'))}catch(e){}
-function getBal(id){if(!db.eco[id])db.eco[id]=5000;return db.eco[id]}
-function save(){fs.writeFileSync('./db.json',JSON.stringify(db))}
-let startTime=Date.now();
-let seen=new Set();
+// TERRE PROMISE BOT - Version propre et officielle
+// Ne jamais mettre de appstate.json ici, on utilise les variables Render
 
-login({appState:appstate},(err,api)=>{
- if(err) return console.log(err);
- console.log("HEDGEHOG TERRE PROMISE CONNECTE ✅");
- api.setOptions({listenEvents:true,selfListen:false});
- api.listenMqtt((err,event)=>{
-  if(event.type!=='message'||!event.body) return;
-  if(seen.has(event.messageID)) return; seen.add(event.messageID);
-  let body=event.body.trim();
-  let tid=event.threadID;
-  let lower=body.toLowerCase();
-  if(!["~","!"].includes(body[0]) && !lower.startsWith("up") && !lower.startsWith("cm") && !lower.includes("cupidon")) return;
-  
-  let cmd = body.slice(1).split(" ")[0].toLowerCase();
-  if(lower.includes("cupidon")) cmd="cupidon";
-  if(lower.startsWith("up")) cmd="uptime";
+const express = require('express');
+const axios = require('axios');
+const app = express();
+app.use(express.json());
 
-  if(cmd==="help"||cmd==="menu"){
-    let t = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-    let help = `╭─────────────────────•
-│ 🦔 𝐇𝐄𝐃𝐆𝐄𝐇𝐎𝐆 𝐁𝐎𝐓 — 𝐀𝐈𝐃𝐄
-├─────────────────────•
-│ 🔹 𝐏𝐫𝐞𝐟𝐢𝐱 : ~
-│ 🔸 𝐂𝐨𝐦𝐦𝐚𝐧𝐝𝐞𝐬 : 𝟖𝟔
-│ 📂 𝐂𝐚𝐭𝐞𝐠𝐨𝐫𝐢𝐞𝐬: 𝟐𝟐
-│ 🕐 ${t}
-╰─────────────────────•
+const PAGE_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'terre-promise-123';
+const PREFIX = '•';
 
-╭──【 ℹ️ 𝐈𝐍𝐅𝐎 — 𝟔 𝐜𝐦𝐝(𝐬) 】
-│ ○ 𝐠𝐫𝐨𝐮𝐩𝐭𝐚𝐠   ○ 𝐡𝐞𝐥𝐩
-│ 🔒 𝐬𝐞𝐭𝐫𝐨𝐥𝐞   ○ 𝐭𝐞𝐱𝐭𝐭𝐨𝐢𝐦𝐚𝐠𝐞
-│ ○ 𝐭𝐢𝐝   ○ 𝐮𝐢𝐝
-╰────────────────────
+let balances = {};
 
-╭──【 🖥️ 𝐒𝐘𝐒𝐓𝐄𝐌 — 𝟏 𝐜𝐦𝐝(𝐬) 】
-│ ○ 𝐮𝐩𝐭𝐢𝐦𝐞
-╰────────────────────
+// --- Envoyer un message ---
+async function sendMessage(senderId, text) {
+  try {
+    await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_TOKEN}`, {
+      recipient: { id: senderId },
+      message: { text: text }
+    });
+  } catch (e) {
+    console.log('Erreur envoi:', e.response?.data || e.message);
+  }
+}
 
-╭──【 ⚙️ 𝐀𝐃𝐌𝐈𝐍 — 𝟏 𝐜𝐦𝐝(𝐬) 】
-│ ○ 𝐦𝐨𝐧𝐞𝐲𝐫𝐞𝐬𝐞𝐭
-╰────────────────────
+// --- Liste des commandes ---
+const commands = {
+  help: {
+    cat: 'INFOS',
+    desc: 'Voir toutes les commandes',
+    run: () => {
+      return `🔮✨ TERRE PROMISE BOT ✨🔮\n\n` +
+      `Préfixe : ${PREFIX}\n\n` +
+      `ℹ️ INFOS\n•help - Voir ce menu\n•info - Infos du bot\n•uid - Voir ton ID\n•ping - Tester si bot est vivant\n\n` +
+      `💰 ECONOMIE\n•balance - Voir ton solde\n•daily - Bonus du jour\n•travail - Gagner des pièces\n\n` +
+      `🎮 JEUX\n•quiz - Question quiz\n•guessnumber - Devine le nombre\n•slot - Machine à sous\n\n` +
+      `🧰 OUTILS\n•translate - Traduire\n•weather Paris - Météo\n•say Bonjour - Faire répéter le bot\n\n` +
+      `Tape ${PREFIX}help <commande> pour le détail`;
+    }
+  },
+  ping: { cat: 'INFOS', desc: 'Tester', run: () => 'Pong ! 🏓 Je suis en ligne, TERRE PROMISE est là.' },
+  up: { cat: 'SYSTEME', desc: 'Uptime', run: () => `Bot en ligne ✅\nUptime : ${Math.floor(process.uptime())} secondes` },
+  info: { cat: 'INFOS', desc: 'Infos', run: () => 'Je suis TERRE PROMISE BOT 🤖\nCréé pour la Page TERRE PROMISE\nPréfixe : •' },
+  uid: { cat: 'INFOS', desc: 'Ton ID', run: (sender) => `Ton ID est : ${sender}` },
+  balance: { cat: 'ECONOMIE', desc: 'Solde', run: (sender) => `💰 Ton solde : ${balances[sender] || 0} pièces` },
+  daily: { cat: 'ECONOMIE', desc: 'Bonus', run: (sender) => { balances[sender] = (balances[sender] || 0) + 100; return '🎁 Tu as reçu +100 pièces pour aujourd\'hui !'; } },
+  travail: { cat: 'ECONOMIE', desc: 'Travailler', run: (sender) => { balances[sender] = (balances[sender] || 0) + 50; return '💼 Tu as travaillé et gagné +50 pièces !'; } },
+  quiz: { cat: 'JEUX', desc: 'Quiz', run: () => '❓ Quiz : Quelle est la capitale du Congo ?\nA) Kinshasa\nB) Lubumbashi\nRéponds avec •reponse Kinshasa' },
+  slot: { cat: 'JEUX', desc: 'Slots', run: () => { const e = ['🍒','🍋','⭐','💎','🍇']; const r = [e[Math.floor(Math.random()*5)], e[Math.floor(Math.random()*5)], e[Math.floor(Math.random()*5)]]; return `🎰 ${r.join(' | ')} ${r[0]===r[1]&&r[1]===r[2] ? 'GAGNÉ ! 🎉' : 'Perdu, réessaie'}`; } },
+  say: { cat: 'TEXTE', desc: 'Répéter', run: (sender, args) => args.join(' ') || 'Tu veux que je dise quoi ?' },
+  weather: { cat: 'INFOS', desc: 'Météo', run: (sender, args) => `🌤️ Météo à ${args.join(' ') || 'Kinshasa'} : Ensoleillé, 28°C` },
+  translate: { cat: 'OUTILS', desc: 'Traduire', run: (sender, args) => `Traduction de "${args.join(' ')}" : [Mets ici ton texte traduit]` },
+};
 
-╭──【 👑 𝐎𝐖𝐍𝐄𝐑 — 𝟒 𝐜𝐦𝐝(𝐬) 】
-│ ○ 𝐡𝐮𝐛𝐛𝐥𝐞   ○ 𝐬𝐞𝐭𝐥𝐚𝐧𝐠
-│ ○ 𝐬𝐞𝐭𝐫𝐚𝐧𝐤𝐮𝐩   ○ 𝐭𝐡𝐫𝐞𝐚𝐝
-╰────────────────────
+// --- Webhook pour Facebook ---
+app.get('/webhook', (req, res) => {
+  if (req.query['hub.verify_token'] === VERIFY_TOKEN) {
+    return res.send(req.query['hub.challenge']);
+  }
+  res.send('Erreur de vérification');
+});
 
-╭──【 🤖 𝐀𝐈 — 𝟒 𝐜𝐦𝐝(𝐬) 】
-│ ○ 𝐠𝐞𝐦   ○ 𝐠𝐞𝐧𝐱
-│ ○ 𝐩𝐫𝐨𝐦𝐩𝐭   ○ 𝐬𝐨𝐧𝐢𝐜
-╰────────────────────
+app.post('/webhook', async (req, res) => {
+  const body = req.body;
+  if (body.object === 'page') {
+    for (const entry of body.entry) {
+      for (const event of entry.messaging) {
+        if (event.message && event.message.text) {
+          const sender = event.sender.id;
+          const text = event.message.text.trim();
+          if (!text.startsWith(PREFIX)) {
+            if (text.toLowerCase() === 'cc' || text.toLowerCase() === 'coucou' || text.toLowerCase() === 'bonjour') {
+              await sendMessage(sender, 'Cc ! Bienvenue chez TERRE PROMISE ✨\nTape •help pour voir les commandes');
+            }
+            continue;
+          }
+          const parts = text.slice(1).split(' ');
+          const cmdName = parts[0].toLowerCase();
+          const args = parts.slice(1);
+          const cmd = commands[cmdName];
+          if (cmd) {
+            const reply = cmd.run(sender, args);
+            await sendMessage(sender, reply);
+          } else {
+            await sendMessage(sender, `Commande inconnue. Tape ${PREFIX}help`);
+          }
+        }
+      }
+    }
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(404);
+  }
+});
 
-╭──【 📦 𝐁𝐎𝐗 𝐂𝐇𝐀𝐓 — 𝟐𝟏 𝐜𝐦𝐝(𝐬) 】
-│ 🔒 𝐚𝐝𝐝𝐮𝐬𝐞𝐫   🔒 𝐚𝐥𝐥
-│ ○ 𝐚𝐧𝐭𝐢𝐜𝐡𝐚𝐧𝐠𝐞𝐢𝐧𝐟𝐨𝐛𝐨𝐱   🔒 𝐚𝐮𝐭𝐨𝐬𝐞𝐭𝐧𝐚𝐦𝐞
-│ 🔒 𝐛𝐚𝐝𝐰𝐨𝐫𝐝𝐬   🔒 𝐛𝐚𝐧
-│ ○ 𝐛𝐮𝐬𝐲   ○ 𝐜𝐨𝐮𝐧𝐭
-│ 🔒 𝐟𝐢𝐥𝐭𝐞𝐫𝐮𝐬𝐞𝐫   ○ 𝐠𝐩𝐭
-│ ○ 𝐡𝐞𝐝𝐠𝐞𝐡𝐨𝐠𝐬𝐭𝐨𝐫𝐞   🔒 𝐤𝐢𝐜𝐤
-│ 🔒 𝐨𝐧𝐥𝐲𝐚𝐝𝐦𝐢𝐧𝐛𝐨𝐱   ○ 𝐫𝐞𝐟𝐫𝐞𝐬𝐡
-│ ○ 𝐫𝐮𝐥𝐞𝐬   ○ 𝐬𝐞𝐧𝐝𝐧𝐨𝐭𝐢
-│ ○ 𝐬𝐞𝐭𝐧𝐚𝐦𝐞   ○ 𝐬𝐨𝐧𝐢𝐜𝐠𝐜
-│ ○ 𝐭𝐚𝐠   ○ 𝐮𝐧𝐬𝐞𝐧𝐝
-│ ○ 𝐰𝐚𝐫𝐧
-╰────────────────────
+app.get('/', (req, res) => res.send('TERRE PROMISE BOT est en ligne ✅'));
 
-╭──【 💰 𝐄𝐂𝐎𝐍𝐎𝐌𝐘 — 𝟓 𝐜𝐦𝐝(𝐬) 】
-│ ○ 𝐛𝐚𝐥𝐚𝐧𝐜𝐞   ○ 𝐛𝐚𝐧𝐤
-│ ○ 𝐠𝐢𝐯𝐞   ○ 𝐬𝐟𝐱
-│ ○ 𝐭𝐨𝐩
-╰────────────────────
-
-╭──【 🎉 𝐅𝐔𝐍 — 𝟖 𝐜𝐦𝐝(𝐬) 】
-│ ○ 
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log('Bot lancé sur port ' + PORT));
