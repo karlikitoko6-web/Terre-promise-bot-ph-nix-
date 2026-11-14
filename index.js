@@ -1,7 +1,8 @@
 const express = require('express');
 const fs = require('fs');
-const login = require('ws3-fca').default || require('ws3-fca');
-
+const ws3 = require('ws3-fca');
+const login = ws3.default || ws3.login || ws3;
+console.log("Type login:", typeof login);
 const app = express();
 const PORT = process.env.PORT || 10000;
 app.get('/', (req, res) => res.send('BOT TERRE PROMISE FB EN LIGNE ✅'));
