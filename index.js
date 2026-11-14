@@ -2,31 +2,40 @@ const fs = require('fs');
 const ws3 = require('ws3-fca');
 const login = ws3.default || ws3.login || ws3;
 
+// FIX POUR RENDER - NE PAS ENLEVER
+const http = require('http');
+http.createServer((req,res) => {
+  res.end('Bot en ligne');
+}).listen(process.env.PORT || 10000);
+
+// TON APPSTATE
 const appstate = JSON.parse(fs.readFileSync('./appstate.json', 'utf8'));
 
-console.log("Démarrage Terre Promise Bøt...");
+console.log("Demarrage Terre Promise Bot...");
 
 login({ appState: appstate }, (err, api) => {
-    if(err) return console.error("Erreur login:", err);
-    
-    console.log("Bot connecté ✅ Terre Promise prêt !");
+    if(err) {
+      console.log("Erreur login:", err);
+      return;
+    }
+    console.log("Bot connecte ✅ Terre Promise pret !");
     api.setOptions({ listenEvents: true, selfListen: false, autoMarkRead: true });
 
     api.listenMqtt((err, event) => {
         if(err) return console.error(err);
-        console.log("Nouvel event:", event.type, event.body || "");
         
         if(event.type === 'message' && event.body){
+            console.log("Nouveau message:", event.body);
             const body = event.body.toLowerCase();
             
-            if(body === '!ping' || body === '!help' || body === 'help' || body === 'salut' || body === 'yo'){
-                api.sendMessage(`Salut ! Je suis en ligne ✅\nTu as dit: ${event.body}\nCommandes: !ping, !help`, event.threadID);
-            }
             if(body === '!ping'){
-                api.sendMessage("Pong! 🏓 Terre Promise Bøt est en ligne boss Karli !", event.threadID);
+                api.sendMessage("Pong! 🏓 Je suis en ligne boss Karli !", event.threadID);
             }
             if(body === '!help'){
-                api.sendMessage("📜 Liste d'aide:\n!ping = test\n!help = aide\nJe fonctionne !", event.threadID);
+                api.sendMessage("📜 Commandes: !ping, !help", event.threadID);
+            }
+            if(body === 'salut' || body === 'yo' || body === 'hello'){
+                api.sendMessage("Salut ! Terre Promise Bot est la ✅", event.threadID);
             }
         }
     });
