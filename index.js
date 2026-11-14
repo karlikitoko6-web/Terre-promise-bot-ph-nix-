@@ -1,6 +1,6 @@
 const express = require('express');
 const fs = require('fs');
-const login = require('ws3-fca');
+const login = require('ws3-fca').default || require('ws3-fca');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
