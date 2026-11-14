@@ -1,41 +1,33 @@
-const express = require('express');
 const fs = require('fs');
 const ws3 = require('ws3-fca');
 const login = ws3.default || ws3.login || ws3;
-console.log("Type login:", typeof login);
-const app = express();
-const PORT = process.env.PORT || 10000;
-app.get('/', (req, res) => res.send('BOT TERRE PROMISE FB EN LIGNE ✅'));
-app.listen(PORT, () => console.log(`Serveur OK port ${PORT}`));
 
-console.log('Démarrage bot FB...');
+const appstate = JSON.parse(fs.readFileSync('./appstate.json', 'utf8'));
 
-// Vérifie si appstate.json existe
-if (!fs.existsSync('appstate.json')) {
-  console.log('❌ ERREUR: appstate.json introuvable ! Upload ton appstate.json sur GitHub');
-  console.log('Le serveur web reste allumé, mais le bot FB ne peut pas se connecter sans appstate');
-} else {
-  try {
-    const appState = JSON.parse(fs.readFileSync('appstate.json', 'utf8'));
-    console.log('appstate.json trouvé, connexion en cours...');
+console.log("Démarrage Terre Promise Bøt...");
+
+login({ appState: appstate }, (err, api) => {
+    if(err) return console.error("Erreur login:", err);
     
-    login({ appState: appState }, (err, api) => {
-      if(err) {
-        console.error('Erreur login FB:', err);
-        return;
-      }
-      console.log('Bot connecté ✅ Terre Promise prêt !');
-      
-      api.listenMqtt((err, event) => {
-        if(err) return;
-        if(event.type === 'message' && event.body) {
-          if(event.body.toLowerCase() === 'salut') {
-            api.sendMessage('Salut boss, Terre Promise Bot est là ✅', event.threadID);
-          }
+    console.log("Bot connecté ✅ Terre Promise prêt !");
+    api.setOptions({ listenEvents: true, selfListen: false, autoMarkRead: true });
+
+    api.listenMqtt((err, event) => {
+        if(err) return console.error(err);
+        console.log("Nouvel event:", event.type, event.body || "");
+        
+        if(event.type === 'message' && event.body){
+            const body = event.body.toLowerCase();
+            
+            if(body === '!ping' || body === '!help' || body === 'help' || body === 'salut' || body === 'yo'){
+                api.sendMessage(`Salut ! Je suis en ligne ✅\nTu as dit: ${event.body}\nCommandes: !ping, !help`, event.threadID);
+            }
+            if(body === '!ping'){
+                api.sendMessage("Pong! 🏓 Terre Promise Bøt est en ligne boss Karli !", event.threadID);
+            }
+            if(body === '!help'){
+                api.sendMessage("📜 Liste d'aide:\n!ping = test\n!help = aide\nJe fonctionne !", event.threadID);
+            }
         }
-      });
     });
-  } catch(e) {
-    console.error('Erreur lecture appstate:', e.message);
-  }
-}
+});
